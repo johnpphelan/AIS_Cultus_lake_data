@@ -68,6 +68,7 @@ sur_col_types_sql <- col_types |>
 
 
 
+
 sql = paste0("CREATE TABLE IF NOT EXISTS floy (
        ",paste0(sur_col_types_sql$a,collapse = ",\n"),
              ",\nPRIMARY KEY (tag_code))")
