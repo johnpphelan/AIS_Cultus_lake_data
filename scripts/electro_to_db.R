@@ -54,13 +54,46 @@ floy_tags = openxlsx::read.xlsx(paste0(lan_folder,"DATA FILES Cultus SMB/2023-20
   janitor::clean_names() |> 
   dplyr::mutate(date = as.character(as.Date(as.numeric(date), origin = "1899-12-31"))
   ) |>
-  mutate(across(everything(), as.character))
+  mutate(across(everything(), as.character)) |> 
+  mutate(rowID = row_number())
 
 col_types<-get_col_types(floy_tags)
 
 sur_col_types_sql <- col_types |>
   dplyr::mutate(key_status = case_when(
-    col_name %in% c("tag_code") ~ "KEY",
+    col_name %in% c("rowID") ~ "KEY",
+    TRUE ~ ""
+  )) |>
+  dplyr::reframe(a = paste0(col_name, " ", stringr::str_to_upper(sqlite_type), " ", key_status))
+
+sql = paste0("CREATE TABLE IF NOT EXISTS floy (
+       ",paste0(sur_col_types_sql$a,collapse = ",\n"),
+             ",\nPRIMARY KEY (rowID))")
+dbExecute(con, sql)
+dbWriteTable(conn = con, "floy", floy_tags, row.names = F, append = T)
+dbListTables(con)
+
+query <- "SELECT * FROM floy"
+dbExecute(con = con, query)
+#querydelete<-"DROP TABLE floy"
+#dbExecute(con, querydelete)
+result <- dbSendQuery(conn = con, query)
+df<-fetch(result, -1)
+df
+dbClearResult(result)    
+
+pks = openxlsx::read.xlsx(paste0(lan_folder,"DATA FILES Cultus SMB/2023-2026 Cultus Lake SMB MASTER Electrofishing.xlsx"), sheet = "All PKS") |> 
+  janitor::clean_names() |> 
+  dplyr::mutate(date = as.character(as.Date(as.numeric(date), origin = "1899-12-31"))
+  ) |>
+  mutate(across(everything(), as.character))|> 
+  mutate(rowID = row_number())
+
+col_types<-get_col_types(pks)
+
+sur_col_types_sql <- col_types |>
+  dplyr::mutate(key_status = case_when(
+    col_name %in% c("rowID") ~ "KEY",
     TRUE ~ ""
   )) |>
   dplyr::reframe(a = paste0(col_name, " ", stringr::str_to_upper(sqlite_type), " ", key_status))
@@ -69,17 +102,20 @@ sur_col_types_sql <- col_types |>
 
 
 
-sql = paste0("CREATE TABLE IF NOT EXISTS floy (
+sql = paste0("CREATE TABLE IF NOT EXISTS pks (
        ",paste0(sur_col_types_sql$a,collapse = ",\n"),
-             ",\nPRIMARY KEY (tag_code))")
+             ",\nPRIMARY KEY (rowID))")
 dbExecute(con, sql)
-dbWriteTable(conn = con, "floy", floy_tags, row.names = F, append = T)
+dbWriteTable(conn = con, "pks", pks, row.names = F, append = T)
 dbListTables(con)
 
-query <- "SELECT * FROM floy"
+query <- "SELECT * FROM pks"
 dbExecute(con = con, query)
 #querydelete<-"DROP TABLE surveyData"
 result <- dbSendQuery(conn = con, query)
 df<-fetch(result, -1)
 df
-dbClearResult(result)    
+dbClearResult(result) 
+
+dbDisconnect(con)
+
